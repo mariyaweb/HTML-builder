@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const folderDist = path.join(__dirname, 'project-dist');
 const folderCss = path.join(__dirname, 'styles');
+const folderAssets = path.join(__dirname, 'assets');
 const bundleHtml = path.join(folderDist, 'index.html');
 const bundleCss = path.join(folderDist, 'style.css');
 const bundleAssets = path.join(folderDist, 'assets');
@@ -13,8 +14,9 @@ const writableStreamHtml = fs.createWriteStream(bundleHtml);
 
 //Create folder project-dist
 fs.mkdir(folderDist, { recursive: true }, (err) => {
-  createBundleHtml()
+  createBundleHtml();
   createBundleCss();
+  copyDir(folderAssets);
 })
 
 //Create bundle html
@@ -23,7 +25,7 @@ const readableStreamHtml = fs.createReadStream(templateLink);
 async function createBundleHtml() {
   readableStreamHtml.on('data', (code) => {
     let templateHtml = code.toString();
-    let newHtml;
+
     fs.readdir(folderСomponents, { withFileTypes: true }, (err, list) => {
       list.forEach((item, index) => {
         if (item.isFile()) {
@@ -33,14 +35,13 @@ async function createBundleHtml() {
           if (extnameItem === '.html') {
             let itemName = path.parse(pathItem).name;
             const readableStreamComponents = fs.createReadStream(pathItem);
+
             readableStreamComponents.on('data', (code) => {
               let tempCode = code.toString();
-              if (index === 0) {
-                newHtml = templateHtml.replaceAll(`{{${itemName}}}`, tempCode);
-              } else {
-                newHtml = newHtml.replaceAll(`{{${itemName}}}`, tempCode);
+              if (index < list.length) {
+                templateHtml = templateHtml.replaceAll(`{{${itemName}}}`, tempCode);
                 if (index === list.length - 1) {
-                  writableStreamHtml.write(newHtml);
+                  writableStreamHtml.write(templateHtml);
                 }
               }
             });
@@ -65,4 +66,34 @@ async function createBundleCss() {
       }
     })
   })
+}
+
+//Create copy assets folder
+async function copyDir(folderLink) {
+  fs.mkdir(bundleAssets, { recursive: true }, (err) => {
+
+    fs.readdir(folderLink, { withFileTypes: true }, (err, list) => {
+
+      list.forEach(item => {
+        let pathItem = path.join(folderLink, item.name);
+
+        if (item.isDirectory()) {
+          let bundleFolder = path.join(bundleAssets, item.name);
+
+          fs.mkdir(bundleFolder, { recursive: true }, (err) => {
+            if (err) console.log(err)
+          });
+
+          copyDir(pathItem);
+        } else if (item.isFile()) {
+          let relativePathItem = path.relative(folderAssets, pathItem);
+          let destItem = path.join(bundleAssets, relativePathItem);
+
+          fs.copyFile(pathItem, destItem, (err) => {
+            if (err) console.log(err);
+          });
+        }
+      });
+    });
+  });
 }
